@@ -1,0 +1,5 @@
+dev: true
+registry_port: 4567
+registry_data_dir: /opt/docker-registry
+registry_cert_dir: /etc/docker/certs
+registry_domain: dev-registry.local
