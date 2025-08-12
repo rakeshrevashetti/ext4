@@ -1,1 +1,27 @@
+- name: Install Docker
+  apt:
+    name: docker.io
+    state: present
+    update_cache: yes
+
+- name: Create certs directory
+  file:
+    path: /etc/docker/certs
+    state: directory
+
+- name: Copy SSL certificate
+  copy:
+    src: files/cert.crt
+    dest: /etc/docker/certs/cert.crt
+
+- name: Run Docker v2 registry with SSL
+  docker_container:
+    name: registry
+    image: registry:2
+    state: started
+    ports:
+      - "443:443"
+    env:
+      REGISTRY_HTTP_TLS_CERTIFICATE: /etc/docker/certs/cert.crt
+      REGISTRY_HTTP_TLS_KEY: /etc/docker/certs/cert.key
  
