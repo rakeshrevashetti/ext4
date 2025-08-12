@@ -1,1 +1,13 @@
+---
+- name: Setup Dev or Management VM
+  hosts: all
+  become: yes
+  tasks:
+    - name: Include Docker registry tasks if dev_vm is true
+      import_tasks: tasks/docker_registry.yml
+      when: dev_vm | bool
+
+    - name: Include GitLab tasks if dev_vm is false
+      import_tasks: tasks/gitlab.yml
+      when: not dev_vm | bool
  
