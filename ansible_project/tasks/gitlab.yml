@@ -1,1 +1,17 @@
+- name: Install GitLab dependencies
+  apt:
+    name: curl
+    state: present
+    update_cache: yes
+
+- name: Download GitLab install script
+  get_url:
+    url: https://packages.gitlab.com/install/repositories/gitlab/gitlab-ee/script.deb.sh
+    dest: /tmp/gitlab_install.sh
+    mode: '0755'
+
+- name: Install GitLab
+  shell: |
+    bash /tmp/gitlab_install.sh
+    EXTERNAL_URL="http://{{ inventory_hostname }}" apt-get install gitlab-ee -y
  
