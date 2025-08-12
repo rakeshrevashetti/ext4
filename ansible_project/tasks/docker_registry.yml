@@ -1,27 +1,60 @@
-- name: Install Docker
-  apt:
-    name: docker.io
-    state: present
-    update_cache: yes
+---
+- name: Install and Configure Secure Docker Registry v2
+  hosts: dev_vm
+  become: true
+  vars:
+    registry_port: 4567
+    registry_data_dir: /opt/docker-registry
+    registry_cert_dir: /etc/docker/certs
+    registry_domain: dev-registry.local
+  tasks:
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
 
-- name: Create certs directory
-  file:
-    path: /etc/docker/certs
-    state: directory
+    - name: Create directories for registry data and certs
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - "{{ registry_data_dir }}"
+        - "{{ registry_cert_dir }}"
 
-- name: Copy SSL certificate
-  copy:
-    src: files/cert.crt
-    dest: /etc/docker/certs/cert.crt
+    - name: Generate self-signed SSL certificate for registry
+      command: >
+        openssl req -newkey rsa:4096 -nodes -sha256
+        -keyout {{ registry_cert_dir }}/domain.key
+        -x509 -days 365
+        -out {{ registry_cert_dir }}/domain.crt
+        -subj "/CN={{ registry_domain }}/O=Dev Registry"
+      args:
+        creates: "{{ registry_cert_dir }}/domain.crt"
 
-- name: Run Docker v2 registry with SSL
-  docker_container:
-    name: registry
-    image: registry:2
-    state: started
-    ports:
-      - "443:443"
-    env:
-      REGISTRY_HTTP_TLS_CERTIFICATE: /etc/docker/certs/cert.crt
-      REGISTRY_HTTP_TLS_KEY: /etc/docker/certs/cert.key
- 
+    - name: Run Docker Registry v2 container with SSL
+      docker_container:
+        name: registry
+        image: registry:2
+        state: started
+        restart_policy: always
+        published_ports:
+          - "{{ registry_port }}:5000"
+        volumes:
+          - "{{ registry_data_dir }}:/var/lib/registry"
+          - "{{ registry_cert_dir }}/domain.crt:/certs/domain.crt:ro"
+          - "{{ registry_cert_dir }}/domain.key:/certs/domain.key:ro"
+        env:
+          REGISTRY_HTTP_ADDR: "0.0.0.0:5000"
+          REGISTRY_HTTP_TLS_CERTIFICATE: /certs/domain.crt
+          REGISTRY_HTTP_TLS_KEY: /certs/domain.key
+
+    - name: Ensure registry is running
+      shell: docker ps | grep registry
+      register: registry_status
+      failed_when: registry_status.rc != 0
+      changed_when: false
+  when: dev | default(false) | bool
